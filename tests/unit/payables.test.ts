@@ -8,6 +8,7 @@ import { openDb, migrate } from "../../src/core/db";
 import { seedAccounts } from "../../src/core/ledger";
 import { importBankCsv } from "../../src/core/bank";
 import { ingestDocument } from "../../src/core/documents";
+import { todayIsoDate } from "../../src/core/dates";
 import {
   registerPayable,
   payPayableFromBank,
@@ -231,7 +232,12 @@ describe("payables (kreditorstyring)", () => {
     const overdueDoc = ingestPurchase(db, root, inbox, "Software ApS", "V-2001", 1250, 250);
     registerPayable(db, { documentId: overdueDoc, billDate: "2024-01-10", dueDate: "2024-02-09", expenseAccountNo: "3000" });
 
-    const today = new Date().toISOString().slice(0, 10);
+    // Must match how buildPayablesList computes its default — todayIsoDate()
+    // returns the calendar date in Danish time (Europe/Copenhagen), whereas
+    // new Date().toISOString() returns UTC. The two diverge for the ~1–2 hour
+    // window each day between Danish midnight and UTC midnight, which would
+    // otherwise make this test fail deterministically every night.
+    const today = todayIsoDate();
 
     const list = buildPayablesList(db);
     expect(list.ok).toBe(true);
