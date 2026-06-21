@@ -7,6 +7,7 @@ export const journalSpecs: CommandSpec[] = [
     description: "Bogfører en manuel finanspostering. Brug 'journal dry-run' først for en ikke-bindende forhåndsvisning.",
     allowedFlags: ["--company", "--input"],
     examplePath: "examples/journal-entry.expense.json",
+    exampleNote: "Se også examples/journal-entry.securities-trade.json for en aktivt-til-aktivt-postering (værdipapirhandel) med sourceBankTransactionId.",
     inputNotes: [
       "transactionDate: YYYY-MM-DD (påkrævet)",
       "text: tekst (påkrævet)",
@@ -14,6 +15,7 @@ export const journalSpecs: CommandSpec[] = [
       "debitAmount/creditAmount: positivt beløb i KRONER (decimal, fx 1250.50) — ikke øre",
       "Hver linje har enten debitAmount eller creditAmount, aldrig begge; sum debet == sum kredit",
       "documentId: heltal — PÅKRÆVET når en linje rammer en udgifts- eller indtægtskonto (bilagsbevis)",
+      "sourceBankTransactionId: heltal — valgfrit, knytter posteringen til en banktransaktion og lukker dens UNMATCHED_BANK_TRANSACTION exception (fx ved aktivt-til-aktivt-postering som værdipapirhandel)",
       'currency: valgfri 3-bogstavs ISO (standard "DKK")',
       "Ved currency != DKK kræves desuden amountForeign, amountDkk og fxRateToDkk (beløb i KRONER)",
     ],

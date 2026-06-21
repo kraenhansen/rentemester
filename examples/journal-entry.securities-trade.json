@@ -1,0 +1,18 @@
+{
+  "transactionDate": "2026-05-12",
+  "text": "Køb af 100 stk. Novo Nordisk B (depotgebyr bogføres separat)",
+  "documentId": 1,
+  "sourceBankTransactionId": 1,
+  "lines": [
+    {
+      "accountNo": "5850",
+      "debitAmount": 65432.50,
+      "text": "Depot, værdipapirer"
+    },
+    {
+      "accountNo": "2000",
+      "creditAmount": 65432.50,
+      "text": "Bank, afregning"
+    }
+  ]
+}
