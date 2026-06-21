@@ -13,8 +13,9 @@ const jsonLd = {
     { "@type": "HowToStep", position: 1, name: "Installer Bun", text: "Installer Bun runtime (1.2+) hvis du ikke allerede har det." },
     { "@type": "HowToStep", position: 2, name: "Klon repoet", text: "Klon Rentemester fra GitHub." },
     { "@type": "HowToStep", position: 3, name: "Installer dependencies", text: "Kør bun install i projektmappen." },
-    { "@type": "HowToStep", position: 4, name: "Initialiser virksomhed", text: "Kør init-kommandoen med et company-bibliotek." },
+    { "@type": "HowToStep", position: 4, name: "Opret workspace og virksomhed", text: "Kør init-kommandoen med både --workspace og --company, så virksomheden registreres i workspacet og er synlig i cockpittet." },
     { "@type": "HowToStep", position: 5, name: "Tjek installation", text: "Kør system healthcheck for at verificere." },
+    { "@type": "HowToStep", position: 6, name: "Start cockpittet", text: "Kør serve --workspace for at åbne den lokale web-UI." },
   ],
 };
 ---
@@ -25,7 +26,7 @@ const jsonLd = {
   pathname="/docs/installation"
   pageType="Article"
   datePublished="2026-05-18"
-  dateModified="2026-05-19"
+  dateModified="2026-06-14"
   ogImage="/og-installation.png"
   jsonLd={jsonLd}
 >
@@ -40,9 +41,17 @@ const jsonLd = {
     <ul>
       <li><strong>Bun</strong> version 1.2 eller nyere. Installér via <a href="https://bun.sh" rel="noopener" target="_blank">bun.sh</a> eller <code>brew install oven-sh/bun/bun</code>.</li>
       <li><strong>Git</strong> til at hente koden.</li>
-      <li>En tom mappe hvor din virksomheds data skal ligge.</li>
+      <li>En tom <strong>workspace-mappe</strong> der skal indeholde dine virksomheder (én eller flere virksomheder ligger som undermapper).</li>
     </ul>
     <p>Det er det. Ingen Node, ingen Docker, ingen database-server. Bun og en lokal SQLite-fil er nok.</p>
+
+    <h3>Workspace eller standalone?</h3>
+    <p>Rentemester ledger-data ligger altid i en <em>company-mappe</em>. Du kan vælge mellem to layouts:</p>
+    <ul>
+      <li><strong>Med workspace (anbefalet):</strong> én ydre mappe indeholder en <code>workspace.json</code>-manifest og én eller flere virksomheder som undermapper. Det er det <strong>eneste</strong> layout cockpittet (<code>serve</code>) kan vise — uden workspace-registrering kan UI'en ikke se virksomheden. Vælg dette hvis du planlægger at bruge web-UI'en eller flere virksomheder.</li>
+      <li><strong>Standalone (kun CLI/MCP):</strong> spring <code>--workspace</code> over og brug kun <code>--company</code>. Fint hvis du udelukkende bruger kommandolinjen eller en AI-agent via MCP — men cockpittet vil ikke kunne finde virksomheden, og der findes i dag <strong>ingen</strong> "adopt"-kommando der efterregistrerer en eksisterende standalone-virksomhed i et workspace.</li>
+    </ul>
+    <p>Denne guide bruger workspace-layoutet hele vejen igennem. Spring <code>--workspace</code>-flaget over hvis du bevidst vælger standalone.</p>
 
     <h2>1. Klon repoet</h2>
     <pre><code>git clone {SITE.github}.git
@@ -52,16 +61,27 @@ cd rentemester</code></pre>
     <pre><code>bun install</code></pre>
     <p>Bun henter <code>@modelcontextprotocol/sdk</code> og <code>zod</code>. Der er ikke meget mere — Rentemester holder afhængighedslisten kort med vilje.</p>
 
-    <h2>3. Initialiser din virksomhed</h2>
-    <p>Vælg en mappe hvor data skal ligge. Den skal være tom.</p>
-    <pre><code>bun run src/cli.ts init --company ./min-virksomhed</code></pre>
-    <p>Det opretter SQLite-ledgeren, mapper til bilag, og en konfigurationsfil. Du kan også køre den i en anden mappe — alt arbejde bruger <code>--company</code>-flaget til at pege på det rigtige bibliotek.</p>
+    <h2>3. Opret workspace og første virksomhed</h2>
+    <p>Vælg en tom workspace-mappe — den bliver hjemstavn for alle dine virksomheder — og initialisér din første virksomhed som en undermappe:</p>
+    <pre><code>mkdir -p ./mit-workspace
+bun run src/cli.ts init \
+  --workspace ./mit-workspace \
+  --company ./mit-workspace/min-virksomhed</code></pre>
+    <p>Det opretter <code>./mit-workspace/workspace.json</code> (manifestet cockpittet læser) og <code>./mit-workspace/min-virksomhed/</code> med SQLite-ledger, bilagsmapper og konfiguration. Virksomheden registreres automatisk i workspacet, så den er synlig næste gang du kører <code>serve</code>.</p>
+    <p>Vil du tilføje flere virksomheder senere — fx et holdingselskab og et driftsselskab side om side — kører du <code>company add --workspace ./mit-workspace --slug ny-virksomhed --name "..."</code>.</p>
 
     <h2>4. Tjek at alt virker</h2>
-    <pre><code>bun run src/cli.ts system healthcheck --company ./min-virksomhed</code></pre>
-    <p>Hvis healthcheck er grøn, er du installeret korrekt.</p>
+    <pre><code>bun run src/cli.ts system healthcheck --company ./mit-workspace/min-virksomhed</code></pre>
+    <p>Hvis healthcheck er grøn, er du installeret korrekt. Bekræft samtidig at virksomheden er registreret i workspacet:</p>
+    <pre><code>bun run src/cli.ts company list --workspace ./mit-workspace</code></pre>
 
-    <h2>5. Prøv et eksempel-flow</h2>
+    <h2>5. Start cockpittet</h2>
+    <p>Cockpittet er Rentemesters lokale web-UI. Den kører kun mod et workspace — derfor er trin 3's <code>--workspace</code> påkrævet hvis du vil bruge den.</p>
+    <pre><code>bun run src/cli.ts serve --workspace ./mit-workspace</code></pre>
+    <p>Default-adressen er <code>http://127.0.0.1:4319</code>. Åbn den i din browser — virksomheden fra trin 3 vises i venstre-menuen. Override host/port med <code>--host</code>/<code>--port</code> eller miljøvariablerne <code>RENTEMESTER_APP_HOST</code> / <code>RENTEMESTER_APP_PORT</code>.</p>
+    <p>Sætter du <code>RENTEMESTER_WORKSPACE=./mit-workspace</code> i din shell, behøver du ikke passere <code>--workspace</code> på hver kommando.</p>
+
+    <h2>6. Prøv et eksempel-flow</h2>
     <p>Repoet indeholder eksempler du kan køre igennem for at se hele flowet:</p>
     <pre><code>bun run smoke</code></pre>
     <p>Det kører hele smoke-testen: opretter en virksomhed, importerer bilag, bogfører, fakturerer, beregner moms, eksporterer til revisor og verificerer. Når den ender med "OK" har du set Rentemester arbejde end-to-end.</p>
