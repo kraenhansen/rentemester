@@ -114,12 +114,27 @@ export function seedAccounts(db: Database) {
     // når en fordring/gæld indfries til en anden kurs end den, den blev bogført
     // til, er forskellen en finansiel gevinst (kredit) — modposten til 3320.
     ["1020", "Valutakursgevinst (realiseret)", "income", "credit", null],
+    // Finansielle indtægter fra værdipapirportefølje (#524 option C):
+    // 1030 holds gross dividend income from depot positions (bank shows net;
+    // gross-up via Årsoversigt at year-end posts the foreign withholding tax
+    // portion against 1400). 1040 carries the lager-princip kursregulering —
+    // a single income-side account that can go negative for net loss years,
+    // matching the convention for Andre værdipapirer og kapitalandele under
+    // ÅRL bilag 1. Both sit at zero for non-investing companies.
+    ["1030", "Udbytte af værdipapirer", "income", "credit", null],
+    ["1040", "Kursregulering, værdipapirer", "income", "credit", null],
     ["1100", "Debitorer", "asset", "debit", null],
     ["1200", "Salgsmoms", "vat", "credit", null],
     // Periodeafgrænsningspost: forudbetalte omkostninger (asset). A prepaid
     // expense already paid that belongs to a later period is parked here until
     // it is recognised period by period.
     ["1300", "Forudbetalte omkostninger", "asset", "debit", null],
+    // Foreign withholding tax credit (#524 option C): when a foreign issuer
+    // withholds tax on dividends (US 15 %, NO 25 %, etc.), Denmark grants a
+    // credit against selskabsskat under the relevant DBO. Carrying it as an
+    // asset reflects that it's a forhåndsbetalt skat — netted off the year's
+    // selskabsskat on the oplysningsskema, not separately refunded.
+    ["1400", "Tilgodehavende udenlandsk udbytteskat", "asset", "debit", null],
     // --- Bank (2xxx) ---
     ["2000", "Bank", "asset", "debit", null],
     // --- External operating expenses (3xxx, 3000-3399) ---
@@ -169,6 +184,16 @@ export function seedAccounts(db: Database) {
     ["5800", "Driftsmidler og inventar", "asset", "debit", null],
     ["5810", "Akkumulerede afskrivninger", "asset", "credit", null],
     ["5820", "Afskrivninger", "expense", "debit", null],
+    // Finansielle anlægsaktiver (#524 option C): ÅRL bilag 1 prescribes these
+    // line items for an ApS that holds portfolio securities or stakes in other
+    // companies. 5850 maps to "Andre værdipapirer og kapitalandele" — passive
+    // depot holdings, mutual funds, minor portfolio positions. 5860 maps to
+    // "Kapitalandele i associerede virksomheder" — typically 20–50% ownership
+    // with significant influence, carried under indre værdis metode. Harmless
+    // (sits at zero) for operating ApS'er that don't have any; required for
+    // holding ApS'er that do.
+    ["5850", "Depot, værdipapirer", "asset", "debit", null],
+    ["5860", "Kapitalandele, associerede virksomheder", "asset", "debit", null],
     // --- Short-term liabilities (7xxx): trade creditors + payroll gæld ---
     ["7000", "Leverandørgæld (kreditorer)", "liability", "credit", null],
     ["7100", "Skyldig A-skat", "liability", "credit", null],
