@@ -1,13 +1,19 @@
-import type { CompanyVat } from "../../lib/types";
+import type { CompanyVatRegistered, CompanyVatNotRegistered } from "../../lib/types";
 import { STATEMENT_COMPANY, STATEMENT_FISCAL_YEARS } from "./_shared";
 
-export function vat(over: Partial<CompanyVat> = {}): CompanyVat {
+/**
+ * The fixture builds a VAT-registered company by default — the discriminated
+ * `vatRegistered: true` variant. Tests that need to render the
+ * "ikke momsregistreret" card use `vatNotRegistered()` below.
+ */
+export function vat(over: Partial<CompanyVatRegistered> = {}): CompanyVatRegistered {
   return {
     slug: "acme-aps",
     selectedYear: "2026",
     archived: false,
     company: STATEMENT_COMPANY,
     fiscalYears: STATEMENT_FISCAL_YEARS,
+    vatRegistered: true,
     // A past, already-ended quarter (#301): closing it is the normal flow with
     // no "period not over yet" warning. Tests that exercise the future-end
     // warning override `periodEnd` with a date in the future.
@@ -36,6 +42,22 @@ export function vat(over: Partial<CompanyVat> = {}): CompanyVat {
       rubrikB: 0,
       rubrikC: 0,
     },
+    ...over,
+  };
+}
+
+/** The not-VAT-registered variant — the cockpit renders an explanation. */
+export function vatNotRegistered(
+  over: Partial<CompanyVatNotRegistered> = {},
+): CompanyVatNotRegistered {
+  return {
+    slug: "holding-aps",
+    selectedYear: "2026",
+    archived: false,
+    company: STATEMENT_COMPANY,
+    fiscalYears: STATEMENT_FISCAL_YEARS,
+    vatRegistered: false,
+    periodLabel: "Ikke momsregistreret",
     ...over,
   };
 }

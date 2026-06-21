@@ -577,6 +577,13 @@ export function exportVatPdf(
   opts: StatementCsvOptions = {},
 ): { content: Buffer; filename: string } {
   const v = buildCompanyVat(workspaceRoot, slug, year);
+  // A non-VAT-registered company has no momsangivelse — refuse the export
+  // cleanly rather than emit a meaningless PDF.
+  if (!v.vatRegistered) {
+    throw new Error(
+      "selskabet er ikke momsregistreret — der er ingen momsangivelse at eksportere",
+    );
+  }
   const rows: StatementPdfRow[] = [];
   rows.push({ kind: "section", label: `Periode: ${v.periodLabel}` });
   rows.push({
@@ -592,7 +599,7 @@ export function exportVatPdf(
   rows.push({
     kind: "line",
     label: "Betalingsfrist (SKAT)",
-    amount: v.deadline ?? "—",
+    amount: v.deadline,
   });
   rows.push({
     kind: "line",

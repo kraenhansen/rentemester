@@ -13,16 +13,19 @@ import { envelopeShape, wrapCoreResult } from "../envelope";
 import { withCompanyDbConfirmed, confirmField } from "../tool-runtime";
 
 const vatTreatmentEnum = z
-  .enum(["standard", "reverse_charge", "representation", "exempt"])
+  .enum(["standard", "reverse_charge", "representation", "exempt", "non_deductible"])
   .optional()
   .describe(
     "How VAT on the expense is treated. " +
-      "'standard' = ordinary Danish purchase VAT, deducted as input VAT (default). " +
+      "'standard' = ordinary Danish purchase VAT, deducted as input VAT (default for a registered company). " +
       "'reverse_charge' = EU/foreign purchase where the buyer self-accounts for VAT " +
       "(omvendt betalingspligt). " +
       "'representation' = entertainment/representation costs with the statutory " +
       "limited VAT deduction. " +
       "'exempt' = the expense carries no deductible VAT. " +
+      "'non_deductible' = a VAT-charged bilag at a NOT VAT-registered company " +
+      "(Momsloven § 37) — the entire VAT is absorbed into the cost basis; no 4000 " +
+      "input-VAT line is written. Refused for a VAT-registered company. " +
       "When omitted, 'standard' is used.",
   );
 
@@ -87,7 +90,7 @@ export function registerExpenseTools(server: McpServer): void {
       documentId: number;
       bankTransactionId: number;
       expenseAccount: string;
-      vatTreatment?: "standard" | "reverse_charge" | "representation" | "exempt";
+      vatTreatment?: "standard" | "reverse_charge" | "representation" | "exempt" | "non_deductible";
       paymentAccount?: string;
       date?: string;
       text?: string;

@@ -24,22 +24,6 @@ import {
 
 export type FiscalYearLabelStrategy = "end-year" | "start-year" | "span";
 
-/**
- * #289: the `companies.vat_period_type` column predates no migration in
- * `schema.sql`; older ledgers (and the base schema) do not have it. Ensure it
- * exists before writing to / reading the company row. Defaults to `quarter`
- * so existing companies keep Rentemester's historical assumption unchanged.
- */
-function ensureVatPeriodColumn(db: Database): void {
-  const cols = db.query("PRAGMA table_info(companies)").all() as Array<{ name: string }>;
-  if (!cols.some((col) => col.name === "vat_period_type")) {
-    db.exec(
-      "ALTER TABLE companies ADD COLUMN vat_period_type TEXT NOT NULL DEFAULT 'quarter' " +
-        "CHECK(vat_period_type IN ('month', 'quarter', 'half-year'));",
-    );
-  }
-}
-
 /** True when the `companies` table carries the `vat_period_type` column. */
 function hasVatPeriodColumn(db: Database): boolean {
   const cols = db.query("PRAGMA table_info(companies)").all() as Array<{ name: string }>;
@@ -73,10 +57,11 @@ export type CompanySettings = {
   /**
    * #289: the VAT settlement cadence the company is registered for with SKAT
    * (`month` / `quarter` / `half-year`). Drives VAT period windows and their
-   * filing deadlines. Defaults to `quarter` so companies created before this
-   * setting existed keep Rentemester's historical assumption unchanged.
+   * filing deadlines. `null` means the company is NOT VAT-registered
+   * (holding ApS, frivilligt momsfritaget, mikrovirksomhed under § 48); every
+   * VAT-aware surface (dashboard, obligations, momsangivelse) gates on this.
    */
-  vatPeriodType: VatPeriodType;
+  vatPeriodType: VatPeriodType | null;
 };
 
 const DEFAULT_PAYMENT_TERMS_DAYS = 14;
@@ -367,7 +352,7 @@ export function initialiseCompanyVolume(
   }
   if (options.vatPeriodType !== undefined && options.vatPeriodType !== null) {
     if (normalizeVatPeriodType(options.vatPeriodType) === null) {
-      throw new Error("vatPeriodType must be one of month, quarter, half-year");
+      throw new Error("vatPeriodType must be one of month, quarter, half-year, or null");
     }
   }
 
@@ -375,9 +360,6 @@ export function initialiseCompanyVolume(
   const db = openDb(p.db);
   try {
     migrate(db);
-    // #289: the VAT-cadence column is not yet part of schema.sql; add it
-    // defensively so a fresh ledger and an older one both carry it.
-    ensureVatPeriodColumn(db);
     seedAccounts(db);
     const cvr = normalizeCvr(options.cvr);
     const fiscalYearStartMonth =
@@ -390,8 +372,14 @@ export function initialiseCompanyVolume(
     const city = options.city?.trim() || null;
     const paymentTermsDays =
       normalizePaymentTermsDays(options.paymentTermsDays) ?? DEFAULT_PAYMENT_TERMS_DAYS;
-    const vatPeriodType =
-      normalizeVatPeriodType(options.vatPeriodType) ?? DEFAULT_VAT_PERIOD_TYPE;
+    // `null` means "not VAT-registered" and is written through verbatim;
+    // undefined (caller didn't pass anything) keeps the historical default
+    // cadence so back-compat for callers who never specified vatPeriodType
+    // is byte-identical to before.
+    const vatPeriodType: VatPeriodType | null =
+      options.vatPeriodType === null
+        ? null
+        : normalizeVatPeriodType(options.vatPeriodType) ?? DEFAULT_VAT_PERIOD_TYPE;
     db.query(
       `INSERT INTO companies (id, name, cvr, fiscal_year_start_month, fiscal_year_label_strategy,
                               address, postal_code, city, payment_terms_days, vat_period_type)
@@ -444,9 +432,10 @@ export type CompanyOnboardingSummary = {
   fiscalYearLabelStrategy: FiscalYearLabelStrategy;
   /**
    * #289: the company's VAT settlement cadence — the canonical period-type
-   * value (`month` / `quarter` / `half-year`), as configured at `init`.
+   * value (`month` / `quarter` / `half-year`), or `null` when the company is
+   * not VAT-registered.
    */
-  vatPeriod: VatPeriodType;
+  vatPeriod: VatPeriodType | null;
   /** Number of accounts seeded into the chart of accounts. */
   accountCount: number;
   /**
@@ -598,7 +587,13 @@ export function getCompanySettings(db: Database): CompanySettings {
     cvrSyncedAt: row.cvr_synced_at,
     paymentTermsDays:
       normalizePaymentTermsDays(row.payment_terms_days) ?? DEFAULT_PAYMENT_TERMS_DAYS,
-    vatPeriodType: normalizeVatPeriodType(row.vat_period_type) ?? DEFAULT_VAT_PERIOD_TYPE,
+    // `null` in the column = "not VAT-registered" — preserved verbatim. A
+    // stored value that fails normalisation (corrupt cell) falls back to the
+    // historical default so legacy ledgers stay readable.
+    vatPeriodType:
+      row.vat_period_type === null
+        ? null
+        : normalizeVatPeriodType(row.vat_period_type) ?? DEFAULT_VAT_PERIOD_TYPE,
   };
 }
 

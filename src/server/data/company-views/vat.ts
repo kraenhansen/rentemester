@@ -20,7 +20,15 @@ import {
 // Per-company VAT return (Moms, year-aware) — cockpit-redesign it. 3
 // --------------------------------------------------------------------------
 
-export type CompanyVat = ReturnType<typeof buildCompanyVat>;
+export type CompanyVatRegistered = Extract<
+  ReturnType<typeof buildCompanyVat>,
+  { vatRegistered: true }
+>;
+export type CompanyVatNotRegistered = Extract<
+  ReturnType<typeof buildCompanyVat>,
+  { vatRegistered: false }
+>;
+export type CompanyVat = CompanyVatRegistered | CompanyVatNotRegistered;
 
 /**
  * Moms — the VAT return for the selected calendar fiscal year. The VAT period
@@ -43,6 +51,21 @@ export function buildCompanyVat(
   const ctx = resolveStatementContext(workspaceRoot, slug, year);
   try {
     const companyBlock = statementCompanyBlock(ctx.company);
+    // A non-VAT-registered company has no period, no deadline and no
+    // momsangivelse. Return a discriminated `vatRegistered: false` variant
+    // so the Cockpit can render an explanation card ("denne virksomhed er
+    // ikke momsregistreret") without ever reading a synthesised period.
+    if (ctx.company.vatPeriodType === null) {
+      return {
+        slug: ctx.entry.slug,
+        selectedYear: ctx.selectedLabel,
+        archived: ctx.isArchivedOnly,
+        company: companyBlock,
+        fiscalYears: ctx.years,
+        vatRegistered: false as const,
+        periodLabel: "Ikke momsregistreret",
+      };
+    }
     if (ctx.isArchivedOnly) {
       const archYear = parseInt(ctx.selectedLabel, 10);
       const archWindow = vatPeriodWindowFor(
@@ -55,6 +78,7 @@ export function buildCompanyVat(
         archived: true,
         company: companyBlock,
         fiscalYears: ctx.years,
+        vatRegistered: true as const,
         periodStart: archWindow.start,
         periodEnd: archWindow.end,
         periodLabel: vatPeriodLabel(archWindow),
@@ -112,6 +136,7 @@ export function buildCompanyVat(
       archived: false,
       company: companyBlock,
       fiscalYears: ctx.years,
+      vatRegistered: true as const,
       periodStart: vat.periodStart,
       periodEnd: vat.periodEnd,
       periodLabel: vatSelection.label,

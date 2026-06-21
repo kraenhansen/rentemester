@@ -153,6 +153,9 @@ export function buildCompanyObligations(
     // has a payable, no VAT obligation is shown. #299: the periods follow the
     // company's real VAT cadence (`vatPeriodType`) — a monthly filer sees up to
     // twelve VAT lines, a half-yearly filer two — never a hardcoded quarter.
+    // A non-registered company has no VAT periods — `vatPeriodsForYear`
+    // returns `[]` for a null cadence, so the loop body simply never runs
+    // and the obligations list carries zero VAT lines.
     for (const window of vatPeriodsForYear(yearNum, ctx.company.vatPeriodType)) {
       const position = vatPositionForPeriod(ctx.db, window.start, window.end);
       if (position.payable > 0) {

@@ -1,5 +1,7 @@
 import { readFileSync } from "node:fs";
+import type { Database } from "bun:sqlite";
 import { migrate } from "../core/db";
+import { getCompanySettings } from "../core/company";
 import {
   buildVatReport,
   postEuServiceReverseChargePurchase,
@@ -16,6 +18,24 @@ import { buildViesRecapitulativeStatement } from "../core/vat-vies-list";
 import { buildOssReport } from "../core/vat-oss";
 // ===== END EU SALES LIST + OSS =====
 
+/**
+ * Refuse every VAT-report-class command when the company is not
+ * VAT-registered. Without this gate the commands would happily build an
+ * empty-rubrikker report for a holding ApS — meaningless output that a SKAT
+ * TastSelv operator could submit by accident. Terminates the process on
+ * failure so callers can carry on without an `if`-guard.
+ */
+function ensureVatRegistered(ctx: CommandContext, db: Database): void {
+  const settings = getCompanySettings(db);
+  if (settings.vatPeriodType !== null) return;
+  ctx.emitResult({
+    ok: false,
+    errors: ["selskabet er ikke momsregistreret"],
+  });
+  db.close();
+  process.exit(1);
+}
+
 export function register(dispatch: CommandDispatch): void {
   dispatch.on("vat", "report", (ctx) => {
     const from = ctx.arg("--from");
@@ -26,6 +46,7 @@ export function register(dispatch: CommandDispatch): void {
     }
     const db = openCommandDb(ctx);
     migrate(db);
+    ensureVatRegistered(ctx, db);
     const result = buildVatReport(db, from, to);
     emitHumanReport("vat-report", result as Record<string, unknown>, ctx.outputFormat);
     db.close();
@@ -84,6 +105,7 @@ export function register(dispatch: CommandDispatch): void {
     }
     const db = openCommandDb(ctx);
     migrate(db);
+    ensureVatRegistered(ctx, db);
     const result = buildVatFiling(db, from, to);
     emitHumanReport("vat-filing", result as Record<string, unknown>, ctx.outputFormat);
     db.close();
@@ -106,6 +128,7 @@ export function register(dispatch: CommandDispatch): void {
     }
     const db = openCommandDb(ctx);
     migrate(db);
+    ensureVatRegistered(ctx, db);
     const result = buildViesRecapitulativeStatement(db, from, to);
     ctx.emitResult(result as Record<string, unknown>);
     db.close();
@@ -122,6 +145,7 @@ export function register(dispatch: CommandDispatch): void {
     }
     const db = openCommandDb(ctx);
     migrate(db);
+    ensureVatRegistered(ctx, db);
     const result = buildOssReport(db, from, to);
     ctx.emitResult(result as Record<string, unknown>);
     db.close();

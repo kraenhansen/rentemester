@@ -240,12 +240,17 @@ Alle kode-håndhævet.
 **Hvad området skal kunne:** Sammenstille et periode-grundlag for moms,
 booke EU-reverse-charge korrekt, anvende den 25 %-grænse for
 repræsentation, klargøre den indberetnings-klare angivelse, og holde
-EU-salg-uden-moms + OSS adskilt fra standard-angivelsen.
+EU-salg-uden-moms + OSS adskilt fra standard-angivelsen. Behandle
+"ikke momsregistreret" som en førsteklasses virksomhedsstilstand så
+holdingselskaber og mikrovirksomheder under § 48-tærsklen kan absorbere
+ikke-fradragsberettiget købsmoms i kostprisen uden at parkere den på
+4000 Købsmoms.
 
-**Lovkilder:** Momsloven §§ 23, 27, 42, 46, 54, 56, 57 + momsbekendtgørelsen § 58.
+**Lovkilder:** Momsloven §§ 23, 27, 37, 42, 46, 47, 48, 54, 56, 57 + momsbekendtgørelsen § 58.
 
 **Centrale filer:** `src/core/vat.ts`, `src/core/vat-filing.ts`,
-`src/core/vat-vies-list.ts`, `src/core/vat-oss.ts`, `src/core/vies.ts`.
+`src/core/vat-vies-list.ts`, `src/core/vat-oss.ts`, `src/core/vies.ts`,
+`src/core/expense-booking.ts`, `src/core/periods.ts`, `src/cli/vat.ts`.
 
 | Rule | Hvad den dækker |
 |---|---|
@@ -256,6 +261,8 @@ EU-salg-uden-moms + OSS adskilt fra standard-angivelsen.
 | [DK-VAT-FILING-001](requirements.md#35-momsloven-lbk-2092024) | Klar momsangivelse kun fra lukket periode, mappet til SKAT-rubrikker. |
 | [DK-VAT-EU-SALES-LIST-001](requirements.md#35-momsloven-lbk-2092024) | EU B2B-salg uden DK-moms grupperes pr. kunde-VAT. |
 | [DK-VAT-OSS-001](requirements.md#35-momsloven-lbk-2092024) | OSS-salg holdes ude af standard-angivelsen. |
+| [DK-VAT-REGISTRATION-001](requirements.md#35-momsloven-lbk-2092024) | Momsregistrering er en eksplicit virksomhedsstilstand — NULL `vat_period_type` = "ikke momsregistreret", momsangivelser/-frister afvises. |
+| [DK-VAT-NON-DEDUCTIBLE-001](requirements.md#35-momsloven-lbk-2092024) | Ikke-registreret virksomhed kan ikke fradrage købsmoms — `non_deductible` absorberer momsen i kostprisen. |
 | [DK-VAT-SEPARATE-AMOUNT-001](requirements.md#36-momsbekendtgørelsen-bek-14352023) | Dansk moms-fradrag kræver angivet moms-beløb. |
 
 Alle kode-håndhævet. VIES-lookup mod EU's moms-VIES-tjeneste bruges

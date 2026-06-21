@@ -2,7 +2,6 @@
 // CLI-selected period.
 
 import {
-  DEFAULT_VAT_PERIOD_TYPE,
   type VatPeriodType,
   vatPeriodLabel,
   vatPeriodWindowFor,
@@ -26,8 +25,22 @@ export function deadlineSection(input: DashboardInput): string {
   // real VAT cadence (`vatPeriodType`) — a half-yearly filer sees "1. halvår
   // 2026" with the half-year deadline, not a quarter. For a `quarter` company
   // the window/label/deadline are byte-identical to the historical behaviour.
-  const vatType: VatPeriodType =
-    input.company.vatPeriodType ?? DEFAULT_VAT_PERIOD_TYPE;
+  // When the company is not VAT-registered the card explains so instead of
+  // inventing a period from a non-existent cadence.
+  if (input.company.vatPeriodType === null) {
+    return `<div class="deadline-card">
+  <div>
+    <div class="label-sm">Næste momsfrist</div>
+    <div class="headline" style="font-size: 18px;">Ikke momsregistreret</div>
+    <div class="muted" style="font-size: 13px; margin-top: var(--space-xxs);"><span class="pill success">Ingen pligt</span> Selskabet er ikke momsregistreret — ingen momsangivelse eller frist.</div>
+  </div>
+  <div style="text-align: right;">
+    <div class="label-sm">Est. nettomoms</div>
+    <div class="amount-lg">—</div>
+  </div>
+</div>`;
+  }
+  const vatType: VatPeriodType = input.company.vatPeriodType;
   const validStart = /^(\d{4})-(\d{2})-(\d{2})/.test(input.vatPeriod.periodStart);
   const window = validStart
     ? vatPeriodWindowFor(input.vatPeriod.periodStart, vatType)

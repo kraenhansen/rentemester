@@ -1,4 +1,4 @@
-version: dk-vat-v0.0.4
+version: dk-vat-v0.0.5
 sources:
   - DK-MOMSLOVEN-2024-209
   - DK-MOMSBEKENDTGORELSEN-2023-1435
@@ -212,3 +212,53 @@ rules:
       rate, and Rentemester does not transmit an OSS return to SKAT — that
       remains the business's responsibility. The rule is uncited because the OSS
       provisions of momsloven fall outside the project's declared legal scope.
+  - rule_id: DK-VAT-REGISTRATION-001
+    name: VAT registration is a first-class company state
+    category: vat_registration
+    source_id: DK-MOMSLOVEN-2024-209
+    provisions:
+      - ref: "§ 47, stk. 1"
+        text_hash: "sha256:c6f2a92227ecbc7dfd2371b021e09c629848f59edfc5852818dc82e7e3994019"
+      - ref: "§ 48, stk. 1"
+        text_hash: "sha256:44637cf51d6d9de49769848a30bee66c33bf8954a849bd23e29c8ff27f5af291"
+    severity: hard_stop
+    machine_rule:
+      require:
+        - company_vat_period_type_is_explicit
+      forbid:
+        - momsangivelse_for_non_registered_company
+        - vat_deadline_for_non_registered_company
+    explanation: >-
+      A Danish company is either VAT-registered with a chosen settlement cadence
+      (month / quarter / half-year per momsloven § 47, stk. 1) or explicitly not
+      VAT-registered (a holding ApS outside § 3, a frivilligt momsfritaget company,
+      or a microbusiness below the § 48, stk. 1 50.000 kr. threshold). Rentemester
+      persists this as `companies.vat_period_type`, with `NULL` carrying the
+      "not registered" state. Every VAT-aware surface — momsangivelse, output-VAT
+      booking, dashboard deadline, obligations list — must gate on this state and
+      refuse to produce output for a non-registered company rather than invent an
+      empty rubrikker report.
+  - rule_id: DK-VAT-NON-DEDUCTIBLE-001
+    name: Non-registered companies absorb input VAT into the expense basis
+    category: vat_posting
+    source_id: DK-MOMSLOVEN-2024-209
+    provisions:
+      - ref: "§ 37, stk. 1"
+        text_hash: "sha256:1f1ebf2d3c8da7aa71e48a0738351f70f2fa9cf499af4d8d8d7a4f2d20659b73"
+    severity: hard_stop
+    machine_rule:
+      condition: company.vat_period_type IS NULL && expense_booking.vat_treatment == 'non_deductible'
+      require:
+        - gross_to_expense_account
+      forbid:
+        - input_vat_line_on_4000
+        - vat_code_attached_to_journal_line
+    explanation: >-
+      A company that is not VAT-registered cannot deduct input VAT under
+      momsloven § 37, stk. 1 (which restricts the deduction right to virksomheder
+      registreret efter §§ 47, 49, 51 eller 51 a). Charged VAT on a purchase
+      bilag is therefore part of cost basis: the `non_deductible` expense
+      treatment books the gross amount on the expense account and never writes
+      a 4000 Købsmoms line. The treatment is refused on a registered company —
+      they must use `standard` so the VAT flows through the input-VAT account
+      and reaches the momsangivelse correctly.

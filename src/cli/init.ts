@@ -85,14 +85,33 @@ function buildOnboardingLines(
   // capture stdout never see it (and so a redirected stdout does not swallow
   // the warning). See buildPaymentDetailsWarningLines above.
 
-  const vatLabel = vatPeriodTypeLabelDa(summary.vatPeriod);
+  // A non-registered company carries `vatPeriod === null` — the onboarding
+  // block surfaces "ikke momsregistreret" and points the owner at
+  // 'company set-profile --vat-period <cadence>' should they later register.
+  const isVatRegistered = summary.vatPeriod !== null;
+  const vatLabel = isVatRegistered
+    ? vatPeriodTypeLabelDa(summary.vatPeriod!)
+    : "ikke momsregistreret";
   lines.push("");
   lines.push("Tjek disse indstillinger — de er svære at ændre senere:");
   lines.push(`  - Regnskabsår: starter 1. ${monthName} (${fiscalLabel})`);
-  lines.push(`  - Momsperiode: ${vatLabel}. Afregner du en anden momsperiode,`);
-  lines.push(
-    `    så kør 'init --vat-period month|quarter|half-year' (standard: quarter).`,
-  );
+  if (isVatRegistered) {
+    lines.push(`  - Momsperiode: ${vatLabel}. Afregner du en anden momsperiode,`);
+    lines.push(
+      `    så kør 'init --vat-period month|quarter|half-year' (standard: quarter),`,
+    );
+    lines.push(
+      `    eller 'init --no-vat' hvis virksomheden ikke er momsregistreret.`,
+    );
+  } else {
+    lines.push(`  - Momsperiode: ${vatLabel}. Bliver virksomheden senere`);
+    lines.push(
+      `    momsregistreret, så sæt momsperioden med`,
+    );
+    lines.push(
+      `    'company set-profile --vat-period month|quarter|half-year'.`,
+    );
+  }
   lines.push(`  - CVR: ${summary.cvr ?? "ikke sat — sæt det med 'init --cvr <DK########>'"}`);
 
   lines.push("");
@@ -124,6 +143,26 @@ export function register(dispatch: CommandDispatch): void {
     const onboardingActor =
       ctx.trimToNull(ctx.arg("--actor")) ?? inferredMutationActor();
 
+    // --no-vat (boolean) and --vat-period none both mean "register the
+    // company as NOT VAT-registered" (null cadence). Combining --no-vat with
+    // an explicit cadence is a user-input error — refuse before we touch the
+    // ledger so the fatal message is the only failure mode.
+    const noVatFlag = ctx.hasFlag("--no-vat");
+    const vatPeriodRaw = ctx.arg("--vat-period");
+    const explicitCadence =
+      vatPeriodRaw !== undefined && vatPeriodRaw !== "none"
+        ? vatPeriodRaw
+        : undefined;
+    if (noVatFlag && explicitCadence !== undefined) {
+      ctx.fatal(
+        "--no-vat kan ikke kombineres med --vat-period <cadence>: vælg enten en momsperiode (month/quarter/half-year) eller --no-vat for en ikke-momsregistreret virksomhed",
+      );
+    }
+    const wantsNoVat = noVatFlag || vatPeriodRaw === "none";
+    const vatPeriodOption: string | null | undefined = wantsNoVat
+      ? null
+      : explicitCadence;
+
     let summary: CompanyOnboardingSummary;
     try {
       initialiseCompanyVolume(root, {
@@ -133,8 +172,9 @@ export function register(dispatch: CommandDispatch): void {
         cvr: ctx.arg("--cvr"),
         fiscalYearStartMonth: ctx.arg("--fiscal-year-start-month"),
         fiscalYearLabelStrategy: ctx.arg("--fiscal-year-label-strategy"),
-        // #289: the company's VAT settlement cadence — month/quarter/half-year.
-        vatPeriodType: ctx.arg("--vat-period"),
+        // #289: the company's VAT settlement cadence — month/quarter/half-year,
+        // or `null` for a not-VAT-registered company.
+        vatPeriodType: vatPeriodOption,
         address: ctx.trimToNull(ctx.arg("--address")) ?? undefined,
         postalCode: ctx.trimToNull(ctx.arg("--postal-code")) ?? undefined,
         city: ctx.trimToNull(ctx.arg("--city")) ?? undefined,

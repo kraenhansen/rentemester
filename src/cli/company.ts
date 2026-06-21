@@ -142,19 +142,44 @@ export function register(dispatch: CommandDispatch): void {
       iban: ctx.trimToNull(ctx.arg("--iban")) ?? undefined,
     };
 
-    // #300: `--vat-period` changes the company's VAT settlement cadence after
-    // init. `setCompanyProfile` does not own the `vat_period_type` column, so
-    // the cadence is written via the periods-core helper. An unknown value is
-    // refused before any profile field is touched.
-    if (hasFlag("--vat-period")) {
-      const vatPeriod = normalizeVatPeriodType(ctx.arg("--vat-period"));
-      if (vatPeriod === null) {
-        ctx.emitResult({
-          ok: false,
-          errors: ["--vat-period must be one of month, quarter, half-year"],
-        });
-        db.close();
-        process.exit(1);
+    // #300: `--vat-period` changes the company's VAT settlement cadence
+    // after init. `--no-vat` (or `--vat-period none`) marks the company as
+    // NOT VAT-registered (null cadence). `setCompanyProfile` does not own
+    // the `vat_period_type` column, so the change is written via the
+    // periods-core helper. An unknown value is refused before any profile
+    // field is touched.
+    const vatPeriodRaw = ctx.arg("--vat-period");
+    const noVatFlag = ctx.hasFlag("--no-vat");
+    const explicitCadence =
+      vatPeriodRaw !== undefined && vatPeriodRaw !== "none"
+        ? vatPeriodRaw
+        : undefined;
+    if (noVatFlag && explicitCadence !== undefined) {
+      ctx.emitResult({
+        ok: false,
+        errors: [
+          "--no-vat kan ikke kombineres med --vat-period <cadence>: vælg enten en momsperiode (month/quarter/half-year) eller --no-vat for en ikke-momsregistreret virksomhed",
+        ],
+      });
+      db.close();
+      process.exit(1);
+    }
+    const wantsNoVat = noVatFlag || vatPeriodRaw === "none";
+    const wantsCadenceChange = hasFlag("--vat-period") || noVatFlag;
+    if (wantsCadenceChange) {
+      let vatPeriod: ReturnType<typeof normalizeVatPeriodType> | null = null;
+      if (!wantsNoVat) {
+        vatPeriod = normalizeVatPeriodType(vatPeriodRaw);
+        if (vatPeriod === null) {
+          ctx.emitResult({
+            ok: false,
+            errors: [
+              "--vat-period must be one of month, quarter, half-year, or 'none' (alias for --no-vat)",
+            ],
+          });
+          db.close();
+          process.exit(1);
+        }
       }
       const vatResult = setCompanyVatPeriodType(db, vatPeriod);
       if (!vatResult.ok) {
@@ -174,12 +199,14 @@ export function register(dispatch: CommandDispatch): void {
       payment,
     });
     // Reflect the cadence on the result so the JSON output and human summary
-    // show the live profile after the edit.
+    // show the live profile after the edit. `vatRegistered` is the derived
+    // boolean clients can switch UI on without reasoning about a null cadence.
     const settings = getCompanySettings(db);
     const enriched = {
       ...result,
       vatPeriodType: settings.vatPeriodType,
-      ...(hasFlag("--vat-period") && result.ok
+      vatRegistered: settings.vatPeriodType !== null,
+      ...(wantsCadenceChange && result.ok
         ? { updatedFields: [...(result.updatedFields ?? []), "vatPeriodType"] }
         : {}),
     };
@@ -202,9 +229,15 @@ export function register(dispatch: CommandDispatch): void {
         city: settings.city,
         paymentTermsDays: settings.paymentTermsDays,
         // #300: the VAT settlement cadence — the canonical value plus its
-        // Danish label, so the owner sees which momsperiode the company files.
+        // Danish label, so the owner sees which momsperiode the company
+        // files. `null` here means the company is not VAT-registered;
+        // `vatRegistered` is the derived boolean clients can read directly.
         vatPeriodType: settings.vatPeriodType,
-        vatPeriodLabel: vatPeriodTypeLabelDa(settings.vatPeriodType),
+        vatPeriodLabel:
+          settings.vatPeriodType === null
+            ? "ikke momsregistreret"
+            : vatPeriodTypeLabelDa(settings.vatPeriodType),
+        vatRegistered: settings.vatPeriodType !== null,
       },
     });
     db.close();

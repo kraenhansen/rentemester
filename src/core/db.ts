@@ -2,6 +2,7 @@ import { Database } from "bun:sqlite";
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { mkdirSync } from "node:fs";
+import { ensureNullableVatPeriodColumn } from "./companies-schema";
 import { backfillRetentionDeadlines } from "./retention";
 
 function hasColumn(db: Database, table: string, column: string) {
@@ -58,6 +59,10 @@ export function migrate(db: Database) {
   // to due date. Captured once on the company profile so every invoice inherits
   // it instead of the owner re-typing it. Older ledgers predate the column.
   if (!hasColumn(db, "companies", "payment_terms_days")) db.exec("ALTER TABLE companies ADD COLUMN payment_terms_days INTEGER NOT NULL DEFAULT 14 CHECK(payment_terms_days BETWEEN 0 AND 365);");
+  // The VAT-cadence column is nullable — `null` means the company is not
+  // VAT-registered. On older ledgers the column may have been added as
+  // `NOT NULL DEFAULT 'quarter'`; the helper rebuilds the table to relax it.
+  ensureNullableVatPeriodColumn(db);
   // #350 — Per-virksomhed mail-alias: hash-friendly identifier brugt som
   // localpart i bilagsmail-adressen (fx "<alias>@bilag.rentemester.dk").
   // Cockpit/CLI håndhæver unicitet før den skrives; her er det nullbart fordi

@@ -141,7 +141,18 @@ export function handleCompanyVatExport(
     );
   }
   const year = resolveYearParam(url.searchParams.get("year"));
-  const exported = exportVatPdf(config.workspaceRoot, slug, year);
+  let exported: ReturnType<typeof exportVatPdf>;
+  try {
+    exported = exportVatPdf(config.workspaceRoot, slug, year);
+  } catch (err) {
+    // exportVatPdf throws when the company is not VAT-registered. Surface
+    // as a clean 400 — there is no momsangivelse to export.
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes("ikke momsregistreret")) {
+      throw ApiError.badRequest(message);
+    }
+    throw err;
+  }
   return new Response(exported.content, {
     headers: {
       "content-type": "application/pdf",

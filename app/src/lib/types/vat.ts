@@ -25,19 +25,36 @@ export type VatRubrikker = {
   rubrikC: number;
 };
 
-export type CompanyVat = {
+/** Fields common to both registered and non-registered companies. */
+type CompanyVatCommon = {
   slug: string;
   selectedYear: string;
   archived: boolean;
   company: StatementCompany;
   fiscalYears: FiscalYearEntry[];
-  periodStart: string;
-  periodEnd: string;
   /**
-   * The VAT period label — follows the company's settlement cadence (#299):
-   * "Q2 2026" (quarter), "Maj 2026" (month), "1. halvår 2026" (half-year).
+   * The VAT period label — for a registered company follows the cadence
+   * (#299): "Q2 2026" (quarter), "Maj 2026" (month), "1. halvår 2026"
+   * (half-year). "Ikke momsregistreret" when the company has none.
    */
   periodLabel: string;
+};
+
+/**
+ * A company that is NOT VAT-registered. The Cockpit must render an
+ * explanation card instead of the period/rubrikker block — `vatRegistered`
+ * is the discriminator that lets TypeScript narrow off this variant
+ * without nullable fields polluting the registered shape.
+ */
+export type CompanyVatNotRegistered = CompanyVatCommon & {
+  vatRegistered: false;
+};
+
+/** A VAT-registered company's momsangivelse data for the selected period. */
+export type CompanyVatRegistered = CompanyVatCommon & {
+  vatRegistered: true;
+  periodStart: string;
+  periodEnd: string;
   /**
    * Genuine output VAT on sales (salgsmoms) for the period, kroner — gross,
    * before any bad-debt relief. A bad-debt write-off books a debit on the
@@ -71,6 +88,8 @@ export type CompanyVat = {
   /** The full SKAT TastSelv momsangivelse rubrics for the period. */
   rubrikker: VatRubrikker;
 };
+
+export type CompanyVat = CompanyVatRegistered | CompanyVatNotRegistered;
 
 export type VatResponse = {
   ok: true;

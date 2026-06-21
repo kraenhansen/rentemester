@@ -273,8 +273,14 @@ export function buildCompanyOverview(
     // VAT position: each VAT period settles separately. Surface the period
     // (month / quarter / half-year, per the company's `vatPeriodType`) that is
     // due now, so the cockpit agrees with the static dashboard and CLI (#299).
-    const vatSelection = selectVatPeriod(db, yearNum, company.vatPeriodType);
-    const vat = vatSelection.position;
+    // A non-registered company has no VAT period — the `vat` block is null
+    // below so the Overblik card hides itself rather than rendering a bogus
+    // Q1 view.
+    const vatSelection =
+      company.vatPeriodType === null
+        ? null
+        : selectVatPeriod(db, yearNum, company.vatPeriodType);
+    const vat = vatSelection?.position ?? null;
 
     // The exception queue — grouped by type into one Danish summary line each,
     // so the "Opgaver" card reads "362 banktransaktioner mangler afstemning"
@@ -373,18 +379,20 @@ export function buildCompanyOverview(
     const egenkapitalandel =
       bs.totalAssets !== 0 ? equityTotal / bs.totalAssets : null;
 
-    const vatDeadline = vatSelection.deadline;
-    const vatBlock: OverviewVat = {
-      periodStart: vat.periodStart,
-      periodEnd: vat.periodEnd,
-      periodLabel: vatSelection.label,
-      outputVat: vat.outputVat,
-      outputVatAdjustment: vat.outputVatAdjustment,
-      inputVat: vat.inputVat,
-      payable: vat.payable,
-      deadline: vatDeadline,
-      daysRemaining: daysBetween(todayIsoDate(), vatDeadline),
-    };
+    const vatBlock: OverviewVat | null =
+      vatSelection !== null && vat !== null
+        ? {
+            periodStart: vat.periodStart,
+            periodEnd: vat.periodEnd,
+            periodLabel: vatSelection.label,
+            outputVat: vat.outputVat,
+            outputVatAdjustment: vat.outputVatAdjustment,
+            inputVat: vat.inputVat,
+            payable: vat.payable,
+            deadline: vatSelection.deadline,
+            daysRemaining: daysBetween(todayIsoDate(), vatSelection.deadline),
+          }
+        : null;
 
     return {
       slug: entry.slug,
@@ -406,7 +414,7 @@ export function buildCompanyOverview(
         bankStatementStatus,
       },
       receivables,
-      vat: vatBlock as OverviewVat | null,
+      vat: vatBlock,
       exceptions: {
         count: exceptions.count,
         rows: exceptionRows,

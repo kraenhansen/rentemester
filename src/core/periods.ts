@@ -1,5 +1,6 @@
 import type { Database } from "bun:sqlite";
 import { insertAuditLog, resolveActor } from "./actor";
+import { ensureNullableVatPeriodColumn } from "./companies-schema";
 import { isValidIsoDate as looksLikeIsoDate, addDays, todayIsoDate, MONTH_NAMES_DA } from "./dates";
 
 export type AccountingPeriodKind = "vat_quarter" | "fiscal_year" | "custom";
@@ -136,13 +137,16 @@ export function vatPeriodLabel(window: VatPeriodWindow): string {
 /**
  * #299: every VAT period window that starts inside calendar `year`, for a
  * company on the given cadence — 12 for a monthly company, 4 for a quarterly
- * company, 2 for a half-yearly company. Returned in chronological order.
+ * company, 2 for a half-yearly company, and `[]` when `type` is `null` (the
+ * company is not VAT-registered). Returned in chronological order.
  *
  * This is the single source of truth for "which VAT periods does a company
  * have in a year" — the cockpit's per-period selection, the obligations list
- * and the dashboard all iterate it instead of hardcoding Q1..Q4.
+ * and the dashboard all iterate it instead of hardcoding Q1..Q4, and they
+ * automatically render zero VAT lines for a non-registered company.
  */
-export function vatPeriodsForYear(year: number, type: VatPeriodType): VatPeriodWindow[] {
+export function vatPeriodsForYear(year: number, type: VatPeriodType | null): VatPeriodWindow[] {
+  if (type === null) return [];
   const span = vatPeriodMonthSpan(type);
   const windows: VatPeriodWindow[] = [];
   for (let startMonth = 1; startMonth <= 12; startMonth += span) {
@@ -152,34 +156,30 @@ export function vatPeriodsForYear(year: number, type: VatPeriodType): VatPeriodW
 }
 
 /**
- * #300: writes the company's VAT settlement cadence (`vat_period_type`) onto
- * the single `companies` row. The cadence is set at `init`/`company add`; this
- * is the supported path to change it afterwards — used by `company set-profile`
- * and the cockpit's PATCH-profile endpoint.
+ * #300: writes the company's VAT settlement cadence onto the single
+ * `companies` row. `type` is `month` / `quarter` / `half-year`, or `null` to
+ * mark the company as NOT VAT-registered (DK-VAT-REGISTRATION-001) — every
+ * VAT-aware surface gates on the null state. Used by `company set-profile`,
+ * the cockpit's PATCH-profile endpoint and `init --no-vat`.
  *
- * The column is ensured (older ledgers and the base schema may lack it) before
- * the write, and a CHECK constraint guards the value, so an invalid cadence is
- * rejected here too. Returns whether the value actually changed.
+ * Defensively ensures the `vat_period_type` column exists and is nullable
+ * before writing — calls `ensureNullableVatPeriodColumn` directly so a
+ * caller that forgot `migrate(db)` still gets the correct shape rather than
+ * a SQLite "no such column" error. A CHECK constraint guards the value.
+ * Returns whether the value actually changed.
  */
 export function setCompanyVatPeriodType(
   db: Database,
-  type: VatPeriodType,
+  type: VatPeriodType | null,
 ): { ok: boolean; changed: boolean; errors: string[] } {
-  if (!VAT_PERIOD_TYPES.has(type)) {
+  if (type !== null && !VAT_PERIOD_TYPES.has(type)) {
     return {
       ok: false,
       changed: false,
-      errors: ["vatPeriodType must be one of month, quarter, half-year"],
+      errors: ["vatPeriodType must be one of month, quarter, half-year, or null"],
     };
   }
-  // Ensure the column exists — older ledgers (and the base schema) lack it.
-  const cols = db.query("PRAGMA table_info(companies)").all() as Array<{ name: string }>;
-  if (!cols.some((col) => col.name === "vat_period_type")) {
-    db.exec(
-      "ALTER TABLE companies ADD COLUMN vat_period_type TEXT NOT NULL DEFAULT 'quarter' " +
-        "CHECK(vat_period_type IN ('month', 'quarter', 'half-year'));",
-    );
-  }
+  ensureNullableVatPeriodColumn(db);
   const before = db
     .query("SELECT vat_period_type AS t FROM companies WHERE id = 1")
     .get() as { t: string | null } | null;
@@ -189,6 +189,40 @@ export function setCompanyVatPeriodType(
       changed: false,
       errors: ["company has not been initialised — run 'rentemester init' first"],
     };
+  }
+  // Going from registered → not-registered must not silently strand posted
+  // VAT activity (output VAT on a sale, deductible input VAT on a bilag).
+  // Refuse when the ledger carries any posted entry on a `vat`-type account
+  // whose date is NOT inside a closed/reported VAT period — i.e. any open
+  // VAT obligation that would otherwise lose its filing path. The owner
+  // must close + indberette before deregistering.
+  if (type === null && before.t !== null) {
+    const openVatActivity = db
+      .query(
+        `SELECT COUNT(*) AS n
+           FROM journal_lines jl
+           JOIN accounts a ON a.id = jl.account_id
+           JOIN journal_entries je ON je.id = jl.journal_entry_id
+          WHERE a.type = 'vat'
+            AND je.status = 'posted'
+            AND NOT EXISTS (
+              SELECT 1
+                FROM accounting_periods ap
+               WHERE ap.kind = 'vat_quarter'
+                 AND ap.status IN ('closed', 'reported')
+                 AND je.transaction_date BETWEEN ap.period_start AND ap.period_end
+            )`,
+      )
+      .get() as { n: number };
+    if (openVatActivity.n > 0) {
+      return {
+        ok: false,
+        changed: false,
+        errors: [
+          "selskabet har bogført momsaktivitet i en åben momsperiode — luk perioden og indberet momsangivelsen før selskabet markeres som ikke-momsregistreret (kør 'vat momsangivelse' efterfulgt af 'period close')",
+        ],
+      };
+    }
   }
   db.query("UPDATE companies SET vat_period_type = ? WHERE id = 1").run(type);
   return { ok: true, changed: before.t !== type, errors: [] };

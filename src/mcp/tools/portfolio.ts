@@ -101,8 +101,32 @@ function companyStatusRow(
     // The VAT period window follows the company's real SKAT cadence
     // (`vatPeriodType`) — a monthly filer gets a one-month window, a
     // half-yearly filer a six-month one. `core/periods.ts` owns the math.
-    const period = vatPeriodWindowFor(asOfDate, settings.vatPeriodType);
-    const vat = buildVatReport(db, period.start, period.end);
+    // A non-registered company has no VAT period — surface a sentinel so
+    // the portfolio JSON consumer can branch on `vatRegistered: false`
+    // instead of reading an invented period.
+    const vatPeriodType = settings.vatPeriodType;
+    const vatBlock =
+      vatPeriodType === null
+        ? {
+            vatRegistered: false as const,
+            periodStart: null,
+            periodEnd: null,
+            daysUntilDue: null,
+            netVatPayable: null,
+            canCompute: false,
+          }
+        : (() => {
+            const period = vatPeriodWindowFor(asOfDate, vatPeriodType);
+            const vat = buildVatReport(db, period.start, period.end);
+            return {
+              vatRegistered: true as const,
+              periodStart: period.start,
+              periodEnd: period.end,
+              daysUntilDue: daysBetween(asOfDate, period.end),
+              netVatPayable: vat.ok ? vat.netVatPayable : null,
+              canCompute: vat.ok,
+            };
+          })();
     const open = buildInvoiceList(db, { status: "open", asOfDate });
     const overdue = buildInvoiceList(db, { status: "overdue", asOfDate });
     const exceptions = listExceptions(db, { status: "open" });
@@ -114,13 +138,7 @@ function companyStatusRow(
       name: settings.name || registeredName,
       cvr: settings.cvr,
       ok: true,
-      vat: {
-        periodStart: period.start,
-        periodEnd: period.end,
-        daysUntilDue: daysBetween(asOfDate, period.end),
-        netVatPayable: vat.ok ? vat.netVatPayable : null,
-        canCompute: vat.ok,
-      },
+      vat: vatBlock,
       openReceivables: {
         count: open.count,
         totalOpenBalance: openReceivables,

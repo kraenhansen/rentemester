@@ -3,15 +3,16 @@ import type { CommandSpec } from "./_shared";
 export const initSpec: CommandSpec[] = [
   {
     key: "init",
-    usage: "init --company <path> [--workspace <dir>] [--name <text>] [--cvr <DK12345678>] [--address <text>] [--postal-code <text>] [--city <text>] [--payment-terms <0-365>] [--vat-period month|quarter|half-year] [--bank-name <text>] [--bank-reg <regnr>] [--bank-account <kontonr>] [--iban <IBAN>] [--fiscal-year-start-month <1-12>] [--fiscal-year-label-strategy end-year|start-year|span]",
+    usage: "init --company <path> [--workspace <dir>] [--name <text>] [--cvr <DK12345678>] [--address <text>] [--postal-code <text>] [--city <text>] [--payment-terms <0-365>] [--vat-period month|quarter|half-year|none] [--no-vat] [--bank-name <text>] [--bank-reg <regnr>] [--bank-account <kontonr>] [--iban <IBAN>] [--fiscal-year-start-month <1-12>] [--fiscal-year-label-strategy end-year|start-year|span]",
     description: "Initialiserer en virksomhed og opretter standardkontoplan. Virksomhedens egen identitet (navn, adresse, CVR) og betalingsoplysninger (bankkonto/IBAN, betalingsfrist) registreres her én gang og flyder automatisk med på hver udstedt faktura og dens PDF.",
-    allowedFlags: ["--company", "--workspace", "--name", "--cvr", "--address", "--postal-code", "--city", "--payment-terms", "--vat-period", "--bank-name", "--bank-reg", "--bank-account", "--iban", "--fiscal-year-start-month", "--fiscal-year-label-strategy"],
+    allowedFlags: ["--company", "--workspace", "--name", "--cvr", "--address", "--postal-code", "--city", "--payment-terms", "--vat-period", "--no-vat", "--bank-name", "--bank-reg", "--bank-account", "--iban", "--fiscal-year-start-month", "--fiscal-year-label-strategy"],
     examplePath: "examples/init-vat-period.txt",
     exampleHint: "rentemester init --example",
     exampleNote: "Eksemplet er en kommandolinje-skabelon — udskift <sti> med din egen virksomhedsmappe og vælg den momsperiode du er registreret for hos SKAT.",
     inputNotes: [
       "Ligger virksomhedsmappen i et workspace (via --workspace eller RENTEMESTER_WORKSPACE), registreres virksomheden også i workspacet, så Cockpittet kan se den.",
       "--vat-period sætter virksomhedens momsperiode: month (måneds-moms), quarter (kvartals-moms) eller half-year (halvårs-moms). Standard er quarter. Vælg den periode du er registreret for hos SKAT — momsperioder og -frister følger dette valg.",
+      "--no-vat (eller --vat-period none) markerer virksomheden som IKKE momsregistreret — et holdingselskab, en frivilligt momsfritaget virksomhed eller en mikrovirksomhed under § 48-tærsklen. Hele momsstakken (dashboard, momsangivelse, deadlines) tier så stille, og købsmoms på bilag absorberes i udgiften via expense book --vat-treatment non_deductible.",
       "Virksomhedsprofilen kan rettes senere med 'company set-profile' — du behøver aldrig at indtaste din egen stamdata på en faktura igen.",
     ],
   },

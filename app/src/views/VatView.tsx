@@ -12,7 +12,7 @@ import { Link, useParams } from "react-router-dom";
 import { api } from "../lib/api";
 import { formatDateDa, formatKroner, tastSelvNumber, todayIso } from "../lib/format";
 import { useAsync } from "../lib/useAsync";
-import type { CompanyVat, VatRubrikker } from "../lib/types";
+import type { CompanyVat, CompanyVatRegistered, VatRubrikker } from "../lib/types";
 import { Banner, ErrorState, Loading } from "../components/Feedback";
 import { CompanyNav, useCompanyYear } from "../components/CompanyNav";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -36,6 +36,39 @@ export function VatView() {
 
   const v = state.data!;
   const currency = v.company.currency || "DKK";
+
+  // A non-VAT-registered company has nothing to show on the moms-tab —
+  // surface an explanation card instead of an empty rubrikker table. Render
+  // early so none of the period-related controls below execute against the
+  // missing period fields, and TypeScript narrows v to CompanyVatRegistered
+  // below.
+  if (!v.vatRegistered) {
+    return (
+      <section className="statement">
+        <div className="page-head">
+          <div>
+            <h2>{v.company.name}</h2>
+            <p className="muted">
+              {v.company.cvr ? `CVR ${v.company.cvr} · ` : ""}
+              {v.company.country} · {currency} · Moms
+            </p>
+          </div>
+        </div>
+        <CompanyNav slug={slug} year={year} setYear={setYear} active="vat" />
+        <Banner kind="info">
+          Denne virksomhed er ikke momsregistreret. Der er derfor ingen momsperiode,
+          ingen momsangivelse og ingen SKAT-frist. Tilkøb af bilag med moms bogføres
+          med <code>expense book --vat-treatment non_deductible</code> så momsen
+          absorberes i udgiften. Skal selskabet alligevel momsregistreres, så sæt en
+          momsperiode under <Link to={`/${slug}/manage`}>Indstillinger</Link>.
+        </Banner>
+      </section>
+    );
+  }
+
+  // TypeScript narrows v to CompanyVatRegistered after the !v.vatRegistered
+  // early return above — every period/deadline/rubrikker field is non-null
+  // from here on. No `!` or `?? ""` shims needed.
   const payablePositive = v.payable >= 0;
   // #301: a period whose end date is still in the future has not ended yet —
   // closing it now is almost always a mistake, so the confirm dialog warns.
@@ -497,7 +530,7 @@ function ReopenDialog({
   onReopened,
   onClose,
 }: {
-  vat: CompanyVat;
+  vat: CompanyVatRegistered;
   onReopened: (label: string) => void;
   onClose: () => void;
 }) {

@@ -186,6 +186,8 @@ hvis det engang bliver krævet.
 | [DK-VAT-FILING-001](../../rules/dk/vat.yaml#L131) | § 57, stk. 1 | Indberetningsklar momsangivelse må kun produceres for en lukket momsperiode og skal mappe til SKAT-rubrikker. | [`src/core/vat-filing.ts:59`](../../src/core/vat-filing.ts#L59) | kode | — |
 | [DK-VAT-EU-SALES-LIST-001](../../rules/dk/vat.yaml#L153) | § 54, stk. 1 | EU B2B-salg uden dansk moms grupperes pr. kunde-CVR/VAT for EU-salg-uden-moms-listen. | [`src/core/vat-vies-list.ts:26`](../../src/core/vat-vies-list.ts#L26) | kode | — |
 | [DK-VAT-OSS-001](../../rules/dk/vat.yaml#L170) | (§§ 66-66m via momsloven OSS-kap.) | OSS-salg til EU-forbrugere holdes ude af standard-momsangivelsen. | [`src/core/vat-oss.ts:32`](../../src/core/vat-oss.ts#L32) | kode | — |
+| [DK-VAT-REGISTRATION-001](../../rules/dk/vat.yaml#L215) | § 47, stk. 1; § 48, stk. 1 | Momsregistrering er en eksplicit virksomhedsstilstand: NULL `vat_period_type` betyder "ikke momsregistreret", og momsangivelser/-frister afvises i denne tilstand. | [`src/core/periods.ts:159`](../../src/core/periods.ts#L159), [`src/cli/vat.ts:22`](../../src/cli/vat.ts#L22) | kode | — |
+| [DK-VAT-NON-DEDUCTIBLE-001](../../rules/dk/vat.yaml#L242) | § 37, stk. 1 | En ikke-momsregistreret virksomhed kan ikke fradrage købsmoms — `non_deductible` bogfører bilaget brutto på udgiftskontoen og skriver ingen 4000-linje. | [`src/core/expense-booking.ts:8`](../../src/core/expense-booking.ts#L8) | kode | — |
 
 ### 3.6 Momsbekendtgørelsen (BEK 1435/2023)
 

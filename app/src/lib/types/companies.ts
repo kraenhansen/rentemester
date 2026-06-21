@@ -95,8 +95,11 @@ export type CreateCompanyInput = {
   cvr?: string;
   fiscalYearStartMonth?: string;
   fiscalYearLabelStrategy?: string;
-  /** The VAT settlement cadence (#300). Defaults to `quarter` server-side. */
-  vatPeriodType?: VatPeriodType;
+  /**
+   * The VAT settlement cadence (#300). Defaults to `quarter` server-side.
+   * Pass `null` to mark the company as NOT VAT-registered.
+   */
+  vatPeriodType?: VatPeriodType | null;
   /** Optional bank/payment details — sets up the primary bank account (#284). */
   payment?: CompanyPaymentInput;
 };
@@ -125,8 +128,11 @@ export type CompanyProfileInput = {
   postalCode?: string;
   city?: string;
   paymentTermsDays?: number;
-  /** The VAT settlement cadence (#300) — month / quarter / half-year. */
-  vatPeriodType?: VatPeriodType;
+  /**
+   * The VAT settlement cadence (#300) — month / quarter / half-year, or
+   * `null` to mark the company as NOT VAT-registered.
+   */
+  vatPeriodType?: VatPeriodType | null;
   payment?: CompanyPaymentInput;
 };
 
@@ -163,8 +169,13 @@ export type CompanySettings = {
   auditWaived: boolean | null;
   /** ISO timestamp the CVR stamdata was last synced; null when never. */
   cvrSyncedAt: string | null;
-  /** The VAT settlement cadence the company is registered for with SKAT (#300). */
-  vatPeriodType: VatPeriodType;
+  /**
+   * The VAT settlement cadence the company is registered for with SKAT
+   * (#300). `null` means the company is NOT VAT-registered — the cockpit
+   * surfaces a "denne virksomhed er ikke momsregistreret" banner on the
+   * moms-tab and hides VAT-only obligations.
+   */
+  vatPeriodType: VatPeriodType | null;
   /** The company's own bank/payment details; null when none is configured. */
   payment: CompanyPaymentDetails | null;
 };

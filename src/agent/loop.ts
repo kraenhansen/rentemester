@@ -783,16 +783,21 @@ function reportVatPeriod(
  */
 function checkDeadlines(db: Database, asOf: string, report: AgentRunReport): void {
   const settings = getCompanySettings(db);
-  // The VAT period the company is currently accruing in is always relevant.
-  const current = vatPeriodWindowFor(asOf, settings.vatPeriodType);
-  // The previous period's momsangivelse is the one with a live deadline; it
-  // is reported whenever its filing deadline has not yet passed.
-  const previous = previousVatPeriod(current);
-  const previousDue = vatFilingDeadline(previous.end) ?? previous.filingDeadline;
-  if (diffDays(asOf, previousDue) >= 0) {
-    reportVatPeriod(db, asOf, previous, report);
+  // A non-registered company has no VAT period and no momsangivelse
+  // deadline — the agent must not invent one. Skip the entire VAT block;
+  // the fiscal-year (årsrapport) deadline below still applies.
+  if (settings.vatPeriodType !== null) {
+    // The VAT period the company is currently accruing in is always relevant.
+    const current = vatPeriodWindowFor(asOf, settings.vatPeriodType);
+    // The previous period's momsangivelse is the one with a live deadline; it
+    // is reported whenever its filing deadline has not yet passed.
+    const previous = previousVatPeriod(current);
+    const previousDue = vatFilingDeadline(previous.end) ?? previous.filingDeadline;
+    if (diffDays(asOf, previousDue) >= 0) {
+      reportVatPeriod(db, asOf, previous, report);
+    }
+    reportVatPeriod(db, asOf, current, report);
   }
-  reportVatPeriod(db, asOf, current, report);
 
   // --- Fiscal year (årsrapport) ---
   const fy = fiscalYearForDate(asOf, settings.fiscalYearStartMonth, settings.fiscalYearLabelStrategy);

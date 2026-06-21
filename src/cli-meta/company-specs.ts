@@ -34,9 +34,9 @@ export const companySpecs: CommandSpec[] = [
     // be discoverable and self-documenting — its --help, flags and --example
     // are part of that promise.
     key: "company set-profile",
-    usage: "company set-profile --company <slug|path> [--name <text>] [--cvr <DK12345678>] [--address <text>] [--postal-code <text>] [--city <text>] [--payment-terms <0-365>] [--vat-period month|quarter|half-year] [--bank-name <text>] [--bank-reg <regnr>] [--bank-account <kontonr>] [--iban <IBAN>]",
+    usage: "company set-profile --company <slug|path> [--name <text>] [--cvr <DK12345678>] [--address <text>] [--postal-code <text>] [--city <text>] [--payment-terms <0-365>] [--vat-period month|quarter|half-year|none] [--no-vat] [--bank-name <text>] [--bank-reg <regnr>] [--bank-account <kontonr>] [--iban <IBAN>]",
     description: "Retter virksomhedens egen profil efter init: navn, CVR, adresse, betalingsfrist, momsperiode og betalingsoplysninger (bankkonto/IBAN). Hver efterfølgende udstedt faktura og dens PDF arver de nye værdier automatisk — du indtaster aldrig din egen stamdata på en faktura.",
-    allowedFlags: ["--company", "--name", "--cvr", "--address", "--postal-code", "--city", "--payment-terms", "--vat-period", "--bank-name", "--bank-reg", "--bank-account", "--iban"],
+    allowedFlags: ["--company", "--name", "--cvr", "--address", "--postal-code", "--city", "--payment-terms", "--vat-period", "--no-vat", "--bank-name", "--bank-reg", "--bank-account", "--iban"],
     examplePath: "examples/company-set-profile.txt",
     exampleHint: "rentemester company set-profile --example",
     exampleNote: "Eksemplet er en kommandolinje-skabelon — udskift <sti-eller-slug> og bankoplysningerne med dine egne.",
@@ -46,6 +46,7 @@ export const companySpecs: CommandSpec[] = [
       "Bankkontoen er append-only: den oprettes ved første kald med bankoplysninger. Et senere kald opretter ikke en ny konto — opdatér i stedet kontoen direkte hvis oplysningerne ændrer sig.",
       "--payment-terms er standard betalingsfrist i dage (udstedelsesdato → forfaldsdato), heltal 0-365.",
       "--vat-period ændrer virksomhedens momsperiode: month (måneds-moms), quarter (kvartals-moms) eller half-year (halvårs-moms). Vælg den periode du er registreret for hos SKAT — momsperioder, -frister og momsangivelsen følger dette valg overalt (dashboard, cockpit, 'period close').",
+      "--no-vat (eller --vat-period none) markerer virksomheden som IKKE momsregistreret. Skiftet afvises hvis ledgeren har bogført momsaktivitet i en åben momsperiode — luk og indberet først.",
     ],
   },
   {

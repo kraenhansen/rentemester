@@ -20,8 +20,9 @@ Indeks:
 - [§ 5. Cybersikkerhed og platformpligter](#5-cybersikkerhed-og-platformpligter)
 - [§ 6. Forbruger- og markedsføringsret](#6-forbruger--og-markedsføringsret)
 - [§ 7. Sektor-specifik regulering](#7-sektor-specifik-regulering)
-- [§ 8. Fremtidige forpligtelser der ikke er gennemført endnu](#8-fremtidige-forpligtelser-der-ikke-er-gennemført-endnu)
-- [§ 9. Sådan beder du om et område der ikke er listet](#9-sådan-beder-du-om-et-område-der-ikke-er-listet)
+- [§ 8. Moms — komplekse fradragsmodeller](#8-moms--komplekse-fradragsmodeller)
+- [§ 9. Fremtidige forpligtelser der ikke er gennemført endnu](#9-fremtidige-forpligtelser-der-ikke-er-gennemført-endnu)
+- [§ 10. Sådan beder du om et område der ikke er listet](#10-sådan-beder-du-om-et-område-der-ikke-er-listet)
 
 ---
 
@@ -131,7 +132,34 @@ gælder enkelte erhverv:
 For en virksomhed i en af de regulerede sektorer skal Rentemester
 suppleres af branche-specifikke værktøjer.
 
-## 8. Fremtidige forpligtelser der ikke er gennemført endnu
+## 8. Moms — komplekse fradragsmodeller
+
+Rentemester modellerer to momsregistrerings-tilstande som førsteklasses
+states ([DK-VAT-REGISTRATION-001](requirements.md#35-momsloven-lbk-2092024)):
+
+- **Fuld momsregistrering** med en cadence (`month` / `quarter` /
+  `half-year`) — den klassiske ApS-/IVS-flow.
+- **Ikke momsregistreret** (`NULL` cadence) — et holdingselskab, en
+  frivilligt momsfritaget virksomhed, eller en mikrovirksomhed under
+  § 48-tærsklen. Bilag med moms bogføres med
+  [`non_deductible`](../../src/core/expense-booking.ts) så momsen
+  absorberes i kostprisen ([DK-VAT-NON-DEDUCTIBLE-001](requirements.md#35-momsloven-lbk-2092024)).
+
+**Hvad der IKKE er modelleret:** den mellemliggende tilstand —
+en momsregistreret virksomhed med BÅDE momspligtige og momsfritagne
+aktiviteter efter momsloven § 13, som efter § 38 har **delvis fradragsret**
+(omsætningsfordeling pr. § 38, stk. 1, eller skønsmæssig fordeling pr.
+§ 38, stk. 2). Det kræver en pr.-konto deductibility-procent og en årlig
+regulering, og er reel men sjælden hos vores målgruppe. En ApS med en
+enkelt § 13-aktivitet (fx undervisning) skal i dag bogføres som
+ikke-momsregistreret eller dropper Rentemester for den del.
+
+Hvis behovet bliver konkret, åbnes et issue: feature'et hænger på en
+ny `accounts.deductibility_percentage`-kolonne plus en
+§ 38-fordelingsmotor; det er en større udvidelse end den binære
+registreret/ikke-registreret-model.
+
+## 9. Fremtidige forpligtelser der ikke er gennemført endnu
 
 Ting der **kommer**, men endnu ikke er aktive eller endnu ikke er
 implementeret i Rentemester:
@@ -142,7 +170,7 @@ implementeret i Rentemester:
 | **SAF-T fuld decken** | Trinvist 2025-2027 | SAF-T eksport ([DK-BOOKKEEPING-SAFT-EXPORT-001](requirements.md#33-bek-972023--digitale-standardbogføringssystemer-benchmark)) er implementeret som "første slice"; resten af MasterFiles- og GeneralLedgerEntries-blokken implementeres trinvist. |
 | **BEK 302/2025 ændring af bilag-opbevaring** | 2026-01-01 | Source er registreret i `legal-sources.json`. Ændringsteksten skal verificeres mod eksisterende regler i [requirements.md § 3.4](requirements.md#34-bek-13832023--pligt-til-opbevaring-af-bilag) — TODO. |
 
-## 9. Sådan beder du om et område der ikke er listet
+## 10. Sådan beder du om et område der ikke er listet
 
 Hvis du støder på en compliance-disciplin Rentemester ikke dækker, og
 du vurderer at den **bør** dækkes:

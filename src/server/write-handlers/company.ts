@@ -99,17 +99,28 @@ export async function handleCompanyProfile(
         paymentTermsDays = body.paymentTermsDays;
       }
 
-      // #300: the VAT settlement cadence is editable from the cockpit. An
-      // unknown value is a 400 — the column has a CHECK constraint, so a bad
-      // string would otherwise fail opaquely.
-      const vatPeriodTypeRaw = optionalBodyString(body, "vatPeriodType");
-      let vatPeriodType: ReturnType<typeof normalizeVatPeriodType> | undefined;
-      if (vatPeriodTypeRaw !== undefined) {
-        vatPeriodType = normalizeVatPeriodType(vatPeriodTypeRaw);
-        if (vatPeriodType === null) {
-          throw ApiError.badRequest(
-            "'vatPeriodType' must be 'month', 'quarter' or 'half-year' when present",
-          );
+      // #300: the VAT settlement cadence is editable from the cockpit.
+      // Accepted values: 'month' / 'quarter' / 'half-year', or `null` / the
+      // string `"none"` to mark the company as NOT VAT-registered. An
+      // unknown value is a 400 — the column has a CHECK constraint, so a
+      // bad string would otherwise fail opaquely.
+      type ParsedVatPeriod = ReturnType<typeof normalizeVatPeriodType> | "explicit-null";
+      let vatPeriodType: ParsedVatPeriod | undefined;
+      if (body.vatPeriodType === null) {
+        vatPeriodType = "explicit-null";
+      } else {
+        const vatPeriodTypeRaw = optionalBodyString(body, "vatPeriodType");
+        if (vatPeriodTypeRaw !== undefined) {
+          if (vatPeriodTypeRaw === "none") {
+            vatPeriodType = "explicit-null";
+          } else {
+            vatPeriodType = normalizeVatPeriodType(vatPeriodTypeRaw);
+            if (vatPeriodType === null) {
+              throw ApiError.badRequest(
+                "'vatPeriodType' must be 'month', 'quarter', 'half-year', 'none', or null when present",
+              );
+            }
+          }
         }
       }
 
@@ -131,11 +142,16 @@ export async function handleCompanyProfile(
         );
       }
 
-      // #300: the VAT cadence lives on the company row but `setCompanyProfile`
-      // does not own it — write it first via the periods-core helper so the
-      // settings the response carries reflect the new cadence.
-      if (vatPeriodType !== undefined && vatPeriodType !== null) {
-        const vatResult = setCompanyVatPeriodType(ctx.db, vatPeriodType);
+      // #300: the VAT cadence lives on the company row but
+      // `setCompanyProfile` does not own it — write it first via the
+      // periods-core helper so the settings the response carries reflect
+      // the new cadence. Passing `null` (parsed as "explicit-null" above)
+      // marks the company as not-VAT-registered; the helper refuses if
+      // there is open VAT activity, which surfaces as a 400 here.
+      if (vatPeriodType !== undefined) {
+        const cadenceForCore =
+          vatPeriodType === "explicit-null" ? null : vatPeriodType;
+        const vatResult = setCompanyVatPeriodType(ctx.db, cadenceForCore);
         if (!vatResult.ok) {
           throw ApiError.badRequest(vatResult.errors[0] ?? "could not set VAT period type");
         }
